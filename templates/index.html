@@ -25,6 +25,8 @@
       <div id="suggest" class="suggest hidden"></div>
     </div>
 
+    <button id="glossary-btn" class="icon-btn" type="button" title="Glossary — what the terms mean">📖</button>
+    <button id="alerts-btn" class="icon-btn" type="button" title="Price alerts">🔔</button>
     <div class="asof" id="asof">—</div>
   </header>
 
@@ -40,6 +42,7 @@
         <div class="price-block">
           <div class="price" id="d-price">—</div>
           <div class="change" id="d-change"></div>
+          <button id="set-alert-btn" class="btn-sm" type="button">🔔 Set alert</button>
         </div>
       </div>
 
@@ -49,8 +52,8 @@
           <div class="card-head">
             <h2>Recommendation</h2>
             <div class="horizon-toggle" id="horizon-toggle">
-              <button data-h="short" class="active">Short-term</button>
-              <button data-h="long">Long-term</button>
+              <button data-h="short" class="active" data-tip="Swing trading view: days to weeks. Weights momentum and fast moving averages.">Short-term</button>
+              <button data-h="long" data-tip="Investing view: months to years. Weights the 200-day trend, golden/death cross and fundamentals.">Long-term</button>
             </div>
           </div>
 
@@ -67,8 +70,8 @@
             </div>
             <div class="rec-meta">
               <div class="rec-label" id="rec-label">—</div>
-              <div class="rec-conf">Confidence: <b id="rec-conf">—</b></div>
-              <div class="rec-conf">Historical Win-Rate: <b id="rec-winrate" style="color: var(--accent)">—</b></div>
+              <div class="rec-conf" data-tip="How strongly and consistently the indicators agree.">Confidence: <b id="rec-conf">—</b></div>
+              <div class="rec-conf" data-tip="How often this strategy's past BUY signals were profitable (backtest over the last year).">Historical Win-Rate: <b id="rec-winrate" style="color: var(--accent)">—</b></div>
               <p class="rec-summary" id="rec-summary"></p>
             </div>
           </div>
@@ -93,12 +96,22 @@
             <h2>Price chart</h2>
             <div class="range-toggle" id="range-toggle">
               <button data-r="1d">1D</button>
+              <button data-r="3d">3D</button>
+              <button data-r="1w">1W</button>
               <button data-r="1mo">1M</button>
               <button data-r="3mo">3M</button>
               <button data-r="6mo" class="active">6M</button>
               <button data-r="1y">1Y</button>
               <button data-r="5y">5Y</button>
             </div>
+          </div>
+          <div class="chart-toolbar" id="chart-toolbar">
+            <button data-tool="levels" class="ct-btn active" title="Show entry / stop / target lines">🎯 Targets &amp; SL</button>
+            <button data-tool="trend" class="ct-btn" title="Click two points to draw a trendline">✏️ Trendline</button>
+            <button data-tool="hline" class="ct-btn" title="Click to drop a horizontal line">— H-line</button>
+            <button id="ct-clear" class="ct-btn" type="button">🗑 Clear drawings</button>
+            <button id="ct-download" class="ct-btn" type="button">⤓ PNG</button>
+            <span class="ct-hint" id="ct-hint"></span>
           </div>
           <div id="chart" class="chart"></div>
           <div class="legend" id="chart-legend"></div>
@@ -119,7 +132,10 @@
     <!-- ===================== DASHBOARD ===================== -->
     <section id="dashboard" class="dashboard">
       <div class="dash-head">
-        <h2>Top picks</h2>
+        <div class="seg" id="dash-mode">
+          <button data-m="signals" class="active" data-tip="Stocks ranked by our 0–100 buy/sell signal score.">⚡ Top picks</button>
+          <button data-m="steady" data-tip="Stocks quietly and steadily trending up (smooth, low-volatility accumulation) — often before the news.">🌱 Steady risers</button>
+        </div>
         <div class="filters">
           <div class="seg" id="f-horizon">
             <button data-h="short" class="active">Short-term</button>
@@ -147,7 +163,7 @@
       </div>
 
       <div id="dash-loader" class="loader">Scanning market…</div>
-      <div class="tables">
+      <div class="tables" id="signal-tables">
         <div class="card">
           <h3 class="tbl-title buy">🟢 Top to BUY</h3>
           <div class="table-scroll">
@@ -161,10 +177,65 @@
           </div>
         </div>
       </div>
+
+      <div id="steady-wrap" class="hidden">
+        <div class="card">
+          <h3 class="tbl-title" style="color:var(--accent)">🌱 Steady risers — quiet, smooth uptrends</h3>
+          <div class="muted" style="margin:-4px 0 12px">
+            Stocks climbing steadily day-by-day on building volume, not yet overextended —
+            the kind of quiet accumulation that often precedes the news. Higher score = smoother, more consistent.
+          </div>
+          <div class="table-scroll"><table id="tbl-steady"></table></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===================== GLOSSARY ===================== -->
+    <section id="glossary-view" class="hidden">
+      <button id="glossary-back" class="back-btn" type="button">← Back to dashboard</button>
+      <div class="card-head"><h2>📖 Glossary — every term in plain English</h2></div>
+      <p class="muted" style="margin:-6px 0 16px">
+        New to the jargon? Here's what each abbreviation and metric in the app means, in simple language.
+        Hover the ⓘ next to any term elsewhere in the app for a quick version.
+      </p>
+      <div id="glossary-content" class="glossary"></div>
+    </section>
+
+    <!-- ===================== ALERTS ===================== -->
+    <section id="alerts-view" class="hidden">
+      <button id="alerts-back" class="back-btn" type="button">← Back to dashboard</button>
+      <div class="card-head"><h2>🔔 Price alerts</h2></div>
+      <div id="alerts-hint" class="muted" style="margin-bottom:12px"></div>
+      <div id="alerts-list"></div>
     </section>
 
     <footer class="disclaimer" id="disclaimer"></footer>
   </main>
+
+  <!-- ===================== ALERT MODAL ===================== -->
+  <div id="alert-modal" class="modal hidden">
+    <div class="modal-card">
+      <h3 id="am-title">Set price alert</h3>
+      <p class="muted" id="am-sub" style="margin:-4px 0 12px"></p>
+      <label class="fld">Target price (₹)
+        <input id="am-target" type="number" step="0.01" inputmode="decimal" />
+      </label>
+      <label class="fld">Stop-loss (₹)
+        <input id="am-stop" type="number" step="0.01" inputmode="decimal" />
+      </label>
+      <label class="fld">Notify email
+        <input id="am-email" type="email" placeholder="you@example.com" />
+      </label>
+      <label class="fld">Note (optional)
+        <input id="am-note" type="text" placeholder="e.g. swing trade" />
+      </label>
+      <div id="am-msg" class="am-msg"></div>
+      <div class="modal-actions">
+        <button id="am-cancel" class="btn-ghost" type="button">Cancel</button>
+        <button id="am-save" class="btn" type="button">Create alert</button>
+      </div>
+    </div>
+  </div>
 
   <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
   <script src="{{ url_for('static', filename='app.js') }}"></script>

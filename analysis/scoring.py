@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
+import numpy as np
 import pandas as pd
 
 from . import indicators
@@ -438,4 +439,135 @@ def scan(data_by_symbol: Dict, horizon: str, fundamentals_by_symbol: Optional[Di
                        else (res["negatives"][0] if res["negatives"] else "")),
         })
     rows.sort(key=lambda r: r["score"], reverse=True)
+    return rows
+
+
+# ---------------------------------------------------------------------------
+# Steady-accumulation screener
+# ---------------------------------------------------------------------------
+# Idea (credit: a seasoned trader): the news everyone sees is already priced in.
+# The edge is spotting stocks that are climbing QUIETLY and STEADILY — a smooth,
+# low-volatility uptrend on rising volume (accumulation) that hasn't yet had its
+# big news-driven pop. This scores exactly that profile.
+
+def steady_score(df, lookback: int = 40) -> Optional[Dict]:
+    """Score how 'steadily and quietly' a stock is trending up over `lookback`
+    trading days. Returns None if there isn't enough data."""
+    if df is None or len(df) < lookback + 12:
+        return None
+    close = df["Close"]
+    window = close.iloc[-lookback:]
+    y = window.values.astype(float)
+    n = len(y)
+    x = np.arange(n)
+
+    # Linear fit -> drift (slope) and smoothness (R^2).
+    slope, intercept = np.polyfit(x, y, 1)
+    yhat = slope * x + intercept
+    ss_res = float(np.sum((y - yhat) ** 2))
+    ss_tot = float(np.sum((y - y.mean()) ** 2)) or 1e-9
+    r2 = max(0.0, 1.0 - ss_res / ss_tot)
+    mean_price = float(y.mean()) or 1e-9
+    slope_pct_day = slope / mean_price * 100.0          # % drift per day
+
+    rets = window.pct_change().dropna().values * 100.0
+    up_days = float(np.mean(rets > 0)) if len(rets) else 0.0      # 0..1
+    daily_vol = float(np.std(rets)) if len(rets) else 0.0        # % std
+    max_day = float(np.max(np.abs(rets))) if len(rets) else 0.0  # biggest 1-day move
+
+    # Accumulation: OBV rising + volume picking up in the recent third.
+    obv = indicators.obv(df).iloc[-lookback:]
+    obv_up = bool(obv.iloc[-1] > obv.iloc[0])
+    v = df["Volume"].iloc[-lookback:].fillna(0).values.astype(float)
+    seg = max(5, n // 3)
+    vol_ratio = float(v[-seg:].mean() / (v[:seg].mean() or 1e-9))
+
+    # Context — are we already overextended / has the pop already happened?
+    sma50 = indicators.sma(close, 50)
+    price = float(close.iloc[-1])
+    dist_50 = ((price - float(sma50.iloc[-1])) / float(sma50.iloc[-1]) * 100.0
+               if pd.notna(sma50.iloc[-1]) else 0.0)
+    rsi_val = float(indicators.rsi(close).iloc[-1])
+    period_return = (price / float(window.iloc[0]) - 1.0) * 100.0
+
+    # Sub-scores (0..1)
+    trend = _clamp(slope_pct_day / 0.25, 0, 1)            # ~0.25%/day = strong steady drift
+    smooth = r2 if slope_pct_day > 0 else 0.0             # smoothness only counts if rising
+    consistency = _clamp((up_days - 0.45) / 0.30, 0, 1)  # 45% up-days -> 0, 75%+ -> 1
+    calm = _clamp(1 - daily_vol / 2.5, 0, 1)             # < 2.5% daily vol is calm
+    accumulation = (0.5 if obv_up else 0.0) + 0.5 * _clamp((vol_ratio - 1) / 0.4, 0, 1)
+
+    comps = [(trend, 1.0), (smooth, 1.6), (consistency, 1.3), (calm, 1.0), (accumulation, 1.2)]
+    raw = sum(val * wt for val, wt in comps) / sum(wt for _, wt in comps)
+
+    # Penalise the "already popped / overextended" profiles (we want PRE-news).
+    penalty = 1.0
+    if rsi_val > 72:
+        penalty *= 0.6
+    if dist_50 > 18:
+        penalty *= 0.7
+    if max_day > 9:
+        penalty *= 0.65   # a big single-day jump = the news may already be out
+    if slope_pct_day <= 0:
+        penalty *= 0.15
+
+    score = int(round(_clamp(raw * penalty, 0, 1) * 100))
+
+    if score >= 70:
+        label = "Strong steady climb"
+    elif score >= 55:
+        label = "Steady riser"
+    elif score >= 40:
+        label = "Mild uptrend"
+    else:
+        label = "Not steady"
+
+    bits = []
+    bits.append(f"{up_days*100:.0f}% up-days")
+    bits.append(f"smoothness {r2:.2f}")
+    if obv_up and vol_ratio > 1.1:
+        bits.append("volume building (accumulation)")
+    elif obv_up:
+        bits.append("OBV rising")
+    if rsi_val <= 65 and dist_50 <= 12:
+        bits.append("not overextended")
+
+    return {
+        "steady_score": score,
+        "label": label,
+        "slope_pct_day": round(slope_pct_day, 3),
+        "slope_pct_month": round(slope_pct_day * 21, 1),
+        "r2": round(r2, 2),
+        "up_days_pct": round(up_days * 100, 0),
+        "daily_vol_pct": round(daily_vol, 2),
+        "vol_ratio": round(vol_ratio, 2),
+        "obv_up": obv_up,
+        "dist_50dma_pct": round(dist_50, 1),
+        "rsi": round(rsi_val, 0),
+        "period_return": round(period_return, 1),
+        "lookback": lookback,
+        "reason": ", ".join(bits),
+    }
+
+
+def scan_steady(data_by_symbol: Dict, meta_by_symbol: Optional[Dict] = None,
+                lookback: int = 40) -> List[Dict]:
+    """Rank a batch of stocks by their steady-accumulation score (risers only)."""
+    meta_by_symbol = meta_by_symbol or {}
+    rows = []
+    for sym, df in data_by_symbol.items():
+        s = steady_score(df, lookback)
+        if not s or s["slope_pct_day"] <= 0:
+            continue  # only quietly-RISING stocks belong here
+        m = meta_by_symbol.get(sym) or {}
+        live = m.get("regularMarketPrice")
+        price = round(float(live), 2) if live else round(float(df["Close"].iloc[-1]), 2)
+        rows.append({
+            "symbol": sym.upper(),
+            "name": m.get("name") or sym.upper(),
+            "sector": m.get("sector", "-"),
+            "price": price,
+            **s,
+        })
+    rows.sort(key=lambda r: r["steady_score"], reverse=True)
     return rows

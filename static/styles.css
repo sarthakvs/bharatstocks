@@ -720,3 +720,198 @@ tbody tr:hover {
 .flash-down {
   animation: flashDown 1.2s ease-out;
 }
+
+/* ---------- Header icon button ---------- */
+.icon-btn {
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  font-size: 16px;
+  line-height: 1;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+.icon-btn:hover { background: var(--card2); }
+
+/* ---------- Small button (Set alert) ---------- */
+.btn-sm {
+  margin-top: 8px;
+  background: var(--card2);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-sm:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* ---------- Chart toolbar ---------- */
+.chart-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  margin: 4px 0 10px;
+}
+.ct-btn {
+  background: var(--bg2);
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ct-btn:hover { color: var(--text); }
+.ct-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+.ct-hint { color: var(--muted); font-size: 11px; margin-left: 4px; }
+
+/* ---------- Steady table accent ---------- */
+#tbl-steady .bar {
+  display: inline-block;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--accent);
+  vertical-align: middle;
+}
+
+/* ---------- Alerts list ---------- */
+.alert-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.alert-row .a-sym { font-weight: 700; min-width: 90px; }
+.alert-row .a-levels { flex: 1; font-size: 12.5px; color: var(--muted); min-width: 160px; }
+.alert-row .a-status { font-size: 12px; font-weight: 700; }
+.alert-row .a-status.active { color: var(--amber); }
+.alert-row .a-status.triggered { color: var(--green); }
+.alert-del {
+  background: transparent; border: 1px solid var(--line); color: var(--red);
+  border-radius: 8px; padding: 5px 10px; cursor: pointer; font-size: 12px;
+}
+.alert-del:hover { background: rgba(255,87,101,.12); }
+
+/* ---------- Modal ---------- */
+.modal {
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,.6);
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+.modal-card {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: 14px; padding: 22px; width: 100%; max-width: 380px;
+  box-shadow: var(--shadow);
+}
+.modal-card h3 { margin: 0 0 4px; }
+.fld { display: block; font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+.fld input {
+  display: block; width: 100%; margin-top: 5px;
+  background: var(--bg2); border: 1px solid var(--line); border-radius: 9px;
+  color: var(--text); padding: 9px 11px; font-size: 14px; outline: none;
+}
+.fld input:focus { border-color: var(--accent); }
+.am-msg { font-size: 12.5px; min-height: 18px; margin-bottom: 8px; }
+.am-msg.err { color: var(--red); }
+.am-msg.ok { color: var(--green); }
+.modal-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.btn-ghost {
+  background: transparent; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 9px;
+  padding: 8px 14px; font-weight: 600; cursor: pointer; font-size: 13px;
+}
+.btn-ghost:hover { color: var(--text); }
+
+/* ---------- Tooltips ---------- */
+.tip-pop {
+  position: fixed;
+  z-index: 300;
+  max-width: 260px;
+  background: #0a0e16;
+  color: var(--text);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 8px 11px;
+  font-size: 12px;
+  line-height: 1.45;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .5);
+  pointer-events: none;
+}
+[data-tip] { cursor: help; }
+.info {
+  font-size: 10px;
+  color: var(--muted);
+  opacity: .6;
+}
+.sk:hover .info { opacity: 1; color: var(--accent); }
+th[data-tip] { text-decoration: underline dotted rgba(138,150,173,.5); text-underline-offset: 3px; }
+
+/* ---------- Glossary ---------- */
+.glossary {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.gl-group {
+  background: linear-gradient(180deg, var(--card), var(--bg2));
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 16px 18px;
+}
+.gl-group h3 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: var(--accent);
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+}
+.gl-item { margin-bottom: 14px; }
+.gl-item:last-child { margin-bottom: 0; }
+.gl-term { font-weight: 700; font-size: 13.5px; margin-bottom: 3px; display: inline-block; }
+.gl-desc { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+
+/* ---------- Mobile / responsive ---------- */
+@media (max-width: 680px) {
+  .topbar {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 10px 14px;
+  }
+  .brand { min-width: 0; flex: 1; }
+  .brand-sub { display: none; }
+  .asof {
+    min-width: 0;
+    flex: 0 0 auto;
+    font-size: 10px;
+    margin-left: auto;
+  }
+  /* search drops to its own full-width row */
+  .searchwrap {
+    order: 3;
+    flex: 1 1 100%;
+    max-width: 100%;
+    margin: 0;
+  }
+  #search { font-size: 16px; padding: 12px 14px; }  /* 16px stops iOS zoom */
+  .suggest { top: 50px; }
+
+  main { padding: 14px; }
+  .detail-head h1 { font-size: 20px; }
+  .price { font-size: 22px; }
+  .dash-head { align-items: flex-start; }
+  .filters { width: 100%; }
+  .filters .seg, .filters .sel, .filters .btn { font-size: 11px; }
+  .stats-grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+  .rec-body { justify-content: center; }
+}

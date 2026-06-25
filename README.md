@@ -20,7 +20,11 @@ levels — for both **short-term** (swing) and **long-term** (investing) horizon
 | 📊 **Levels** | Suggested **entry**, **ATR-based stop-loss**, **Target 1 / Target 2** (2:1 & 3:1 risk-reward), and risk %. |
 | 📈 **Interactive chart** | Candlestick + volume + 20/50/200-DMA overlays. Ranges: 1D (intraday) · 1M · 3M · 6M · 1Y · 5Y. |
 | 🏆 **Top picks** | Scans Nifty 50 / Nifty 100 and ranks **Top to BUY** and **Avoid / SELL**, for short or long horizon, over 1D / 1W / 1M / 3M / 6M / 1Y. |
-| 🧮 **Full technicals** | RSI, MACD, ADX, Stochastic, Bollinger, ATR, OBV + fundamentals (P/E, P/B, ROE, market cap, 52-week range, analyst target). |
+| 🌱 **Steady risers** | Screener for stocks climbing **quietly and steadily** (smooth trend via regression R², high % up-days, low volatility, rising OBV/volume = accumulation, not yet overextended) — the kind of move that often *precedes* the news. |
+| ✏️ **Chart editor** | Auto-drawn **entry / stop / target** price lines, plus **drag-to-draw trendlines**, click **horizontal lines**, clear, and **download the chart as PNG**. |
+| 🔔 **Price alerts** | Set a **target / stop-loss alert** on any stock (pre-filled from the recommendation); get an **email** when it's hit. Background poller + on-demand `/api/alerts/check`. |
+| 🧮 **Full technicals** | RSI, MACD, ADX, Stochastic, Bollinger, ATR, OBV + news sentiment + fundamentals (P/E, P/B, ROE, market cap, 52-week range, analyst target) + historical win-rate backtest. |
+| 📱 **Responsive** | Works on mobile — full-width search, stacked layout. |
 
 ---
 
@@ -121,8 +125,26 @@ default in the `Dockerfile`/`Procfile`.
 | `PORT` | Port to bind | `8000` (Docker) / platform-provided |
 | `WEB_CONCURRENCY` | gunicorn workers (keep at 1 for a shared cache) | `1` |
 | `THREADS` | gunicorn threads per worker | `8` |
+| `SMTP_USER` / `SMTP_PASS` | Email login for price alerts (Gmail: use an **App Password**) | _(unset = no email)_ |
+| `SMTP_HOST` / `SMTP_PORT` | Mail server | `smtp.gmail.com` / `587` |
+| `ALERT_FROM` | From address | `SMTP_USER` |
+| `ALERT_TO` | Default recipient (pre-fills the alert form) | `SMTP_USER` |
+| `ALERTS_INTERVAL` | Seconds between background alert checks | `300` |
+| `ALERTS_ENABLED` | Set `0` to disable the background poller | `1` |
 
-`/api/health` is intentionally left unauthenticated so platform health checks work.
+`/api/health` and `/api/alerts/check` are left unauthenticated (health probes + external cron).
+
+### Price-alert email setup (Gmail example)
+
+1. Enable 2-step verification on the Google account, then create an **App Password**
+   (Google Account → Security → App passwords).
+2. Set `SMTP_USER=you@gmail.com` and `SMTP_PASS=<the 16-char app password>`.
+3. Done — when an alert's target/stop is hit, you get an email.
+
+> On a **sleeping free tier**, the in-process poller pauses while the app is idle.
+> For reliable alerts, point a free cron (e.g. cron-job.org) at
+> `https://<your-app>/api/alerts/check` every few minutes — it triggers a check on demand.
+> **SMS** isn't built in (every reliable gateway like Twilio is paid); email is the free channel.
 
 ### Option 1 — Render (easiest, has a free tier)
 

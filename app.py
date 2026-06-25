@@ -15,9 +15,12 @@ from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
 from flask import Flask, Response, jsonify, render_template, request
 
-from analysis import data, indicators, scoring, universe, yahoo
+from analysis import alerts, data, indicators, scoring, universe, yahoo
 
 app = Flask(__name__)
+# Re-read templates from disk when they change (negligible cost; avoids serving
+# a stale cached index.html after edits).
+app.config["TEMPLATES_AUTO_RELOAD"] = True
 
 # --- Optional password protection (enabled only when APP_PASSWORD is set) ----
 # For any non-local deployment, set APP_PASSWORD (and optionally APP_USERNAME)
@@ -30,8 +33,8 @@ APP_PASSWORD = os.environ.get("APP_PASSWORD")
 def _require_auth():
     if not APP_PASSWORD:
         return  # auth disabled (local development)
-    if request.path == "/api/health":
-        return  # let platform health checks through unauthenticated
+    if request.path in ("/api/health", "/api/alerts/check"):
+        return  # health checks + external cron trigger allowed unauthenticated
     auth = request.authorization
     ok = (
         auth is not None
@@ -44,9 +47,13 @@ def _require_auth():
             {"WWW-Authenticate": 'Basic realm="BharatStocks"'},
         )
 
-# Map a chart "range" selector to a yfinance (period, interval).
+# Map a chart "range" selector to a Yahoo (range, interval).
+# Yahoo has no native 3-day range, so "3d" fetches 5 days of 5-min bars and is
+# sliced to the last 3 trading days below.
 CHART_RANGES = {
     "1d": ("1d", "5m"),
+    "3d": ("5d", "5m"),
+    "1w": ("5d", "15m"),
     "5d": ("5d", "15m"),
     "1mo": ("1mo", "1d"),
     "3mo": ("3mo", "1d"),
@@ -135,6 +142,10 @@ def api_stock(symbol):
     intraday = interval.endswith("m") or interval.endswith("h")
     if intraday:
         chart_df = data.get_history(symbol, period=period, interval=interval, ttl=120)
+        if chart_range == "3d" and not chart_df.empty:
+            # Keep only the last 3 trading days (Yahoo has no native 3d range).
+            last_days = sorted(set(chart_df.index.normalize()))[-3:]
+            chart_df = chart_df[chart_df.index.normalize().isin(last_days)]
     elif chart_range in ("5y",):
         chart_df = data.get_history(symbol, period=period, interval=interval)
     else:  # slice from the 2y daily frame we already have
@@ -245,6 +256,78 @@ def api_top():
         "sells": sells,
         "disclaimer": DISCLAIMER,
     })
+
+
+@app.route("/api/steady")
+def api_steady():
+    """Steady-accumulation screener: stocks quietly trending up (pre-news)."""
+    uni = request.args.get("universe", "nifty100")
+    try:
+        limit = max(3, min(40, int(request.args.get("limit", 15))))
+    except ValueError:
+        limit = 15
+
+    symbols = universe.scan_symbols(uni)
+    hist_meta_map = data.batch_history_meta(symbols, period="2y", interval="1d", ttl=900)
+    hist_map = {s: v[0] for s, v in hist_meta_map.items()}
+    meta_map = {}
+    for s in symbols:
+        m = dict(universe.get_meta(s))
+        if s in hist_meta_map:
+            m["regularMarketPrice"] = hist_meta_map[s][1].get("regularMarketPrice")
+        meta_map[s] = m
+
+    rows = scoring.scan_steady(hist_map, meta_by_symbol=meta_map)[:limit]
+    return jsonify({
+        "ok": True, "universe": uni, "count": len(rows),
+        "as_of": _now_ist(), "rows": rows, "disclaimer": DISCLAIMER,
+    })
+
+
+@app.route("/api/config")
+def api_config():
+    return jsonify({
+        "email_configured": alerts.email_configured(),
+        "default_email": os.environ.get("ALERT_TO") or os.environ.get("SMTP_USER") or "",
+    })
+
+
+@app.route("/api/alerts", methods=["GET", "POST"])
+def api_alerts():
+    if request.method == "POST":
+        body = request.get_json(silent=True) or {}
+        symbol = (body.get("symbol") or "").strip().upper()
+        if not symbol:
+            return jsonify({"ok": False, "error": "symbol is required"}), 400
+        target, stop = body.get("target"), body.get("stop")
+        if target in (None, "") and stop in (None, ""):
+            return jsonify({"ok": False, "error": "Set a target and/or a stop-loss."}), 400
+        email = (body.get("email") or os.environ.get("ALERT_TO")
+                 or os.environ.get("SMTP_USER") or "").strip()
+        if not email:
+            return jsonify({"ok": False, "error": "An email address is required."}), 400
+        a = alerts.create_alert(symbol, target, stop, email,
+                                body.get("direction", "long"),
+                                body.get("name", ""), body.get("note", ""))
+        return jsonify({"ok": True, "alert": a})
+    return jsonify({"ok": True, "alerts": alerts.list_alerts(),
+                    "email_configured": alerts.email_configured()})
+
+
+@app.route("/api/alerts/<alert_id>", methods=["DELETE"])
+def api_alert_delete(alert_id):
+    return jsonify({"ok": alerts.delete_alert(alert_id)})
+
+
+@app.route("/api/alerts/check", methods=["GET", "POST"])
+def api_alerts_check():
+    """Manual / external-cron trigger to check alerts now."""
+    return jsonify({"ok": True, **alerts.check_alerts()})
+
+
+# Start the background alert poller (no-op if disabled). Runs under gunicorn too.
+if os.environ.get("ALERTS_ENABLED", "1") != "0":
+    alerts.start_scheduler(interval=int(os.environ.get("ALERTS_INTERVAL", 300)))
 
 
 if __name__ == "__main__":
