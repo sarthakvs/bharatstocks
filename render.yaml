@@ -1,0 +1,18 @@
+# Render.com Blueprint — deploy with: New + > Blueprint > point at this repo.
+# Docs: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: bharatstocks
+    runtime: python
+    plan: free                # 512 MB RAM; spins down when idle (cold starts)
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn -w 1 --threads 8 -k gthread -b 0.0.0.0:$PORT --timeout 60 app:app
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.6"
+      - key: APP_PASSWORD     # set the value in the Render dashboard (kept secret)
+        sync: false
+      - key: APP_USERNAME
+        value: admin

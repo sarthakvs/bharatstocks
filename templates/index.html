@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BharatStocks — Indian Market Analyzer</title>
+  <link rel="preconnect" href="https://unpkg.com" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+</head>
+
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">📈</span>
+      <div>
+        <div class="brand-name">BharatStocks</div>
+        <div class="brand-sub">Indian Market Analyzer</div>
+      </div>
+    </div>
+
+    <div class="searchwrap">
+      <input id="search" type="text" autocomplete="off" spellcheck="false"
+        placeholder="Search any stock — e.g. RELIANCE, Infosys, HDFC Bank…" />
+      <div id="suggest" class="suggest hidden"></div>
+    </div>
+
+    <div class="asof" id="asof">—</div>
+  </header>
+
+  <main>
+    <!-- ===================== STOCK DETAIL ===================== -->
+    <section id="detail" class="detail hidden">
+      <button id="back-btn" class="back-btn" type="button">← Back to dashboard</button>
+      <div class="detail-head">
+        <div>
+          <h1 id="d-name">—</h1>
+          <div class="sub"><span id="d-symbol"></span> · <span id="d-sector"></span></div>
+        </div>
+        <div class="price-block">
+          <div class="price" id="d-price">—</div>
+          <div class="change" id="d-change"></div>
+        </div>
+      </div>
+
+      <div class="detail-grid">
+        <!-- Recommendation -->
+        <div class="card rec-card">
+          <div class="card-head">
+            <h2>Recommendation</h2>
+            <div class="horizon-toggle" id="horizon-toggle">
+              <button data-h="short" class="active">Short-term</button>
+              <button data-h="long">Long-term</button>
+            </div>
+          </div>
+
+          <div class="rec-body">
+            <div class="gauge">
+              <svg viewBox="0 0 120 120" class="gauge-svg">
+                <circle cx="60" cy="60" r="52" class="gauge-bg"></circle>
+                <circle cx="60" cy="60" r="52" class="gauge-fg" id="gauge-fg"></circle>
+              </svg>
+              <div class="gauge-center">
+                <div class="gauge-score" id="rec-score">—</div>
+                <div class="gauge-of">/100</div>
+              </div>
+            </div>
+            <div class="rec-meta">
+              <div class="rec-label" id="rec-label">—</div>
+              <div class="rec-conf">Confidence: <b id="rec-conf">—</b></div>
+              <div class="rec-conf">Historical Win-Rate: <b id="rec-winrate" style="color: var(--accent)">—</b></div>
+              <p class="rec-summary" id="rec-summary"></p>
+            </div>
+          </div>
+
+          <div class="levels" id="levels"></div>
+
+          <div class="reasons">
+            <div class="reason-col">
+              <h3 class="pos">▲ Supporting</h3>
+              <ul id="rec-pos"></ul>
+            </div>
+            <div class="reason-col">
+              <h3 class="neg">▼ Risks / Watch</h3>
+              <ul id="rec-neg"></ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chart -->
+        <div class="card chart-card">
+          <div class="card-head">
+            <h2>Price chart</h2>
+            <div class="range-toggle" id="range-toggle">
+              <button data-r="1d">1D</button>
+              <button data-r="1mo">1M</button>
+              <button data-r="3mo">3M</button>
+              <button data-r="6mo" class="active">6M</button>
+              <button data-r="1y">1Y</button>
+              <button data-r="5y">5Y</button>
+            </div>
+          </div>
+          <div id="chart" class="chart"></div>
+          <div class="legend" id="chart-legend"></div>
+        </div>
+      </div>
+
+      <!-- Indicators + fundamentals -->
+      <div class="card">
+        <div class="card-head">
+          <h2>Technicals &amp; fundamentals</h2>
+        </div>
+        <div class="stats-grid" id="stats-grid"></div>
+      </div>
+    </section>
+
+    <div id="detail-loader" class="loader hidden">Loading analysis…</div>
+
+    <!-- ===================== DASHBOARD ===================== -->
+    <section id="dashboard" class="dashboard">
+      <div class="dash-head">
+        <h2>Top picks</h2>
+        <div class="filters">
+          <div class="seg" id="f-horizon">
+            <button data-h="short" class="active">Short-term</button>
+            <button data-h="long">Long-term</button>
+          </div>
+          <div class="seg" id="f-period">
+            <button data-p="1d">1D</button>
+            <button data-p="1w" class="active">1W</button>
+            <button data-p="1mo">1M</button>
+            <button data-p="3mo">3M</button>
+            <button data-p="6mo">6M</button>
+            <button data-p="1y">1Y</button>
+          </div>
+          <select id="f-universe" class="sel">
+            <option value="nifty50">Nifty 50</option>
+            <option value="nifty100">Nifty 100</option>
+            <option value="all">All (bundled)</option>
+          </select>
+          <select id="f-sort" class="sel">
+            <option value="score">Sort: Signal score</option>
+            <option value="return">Sort: Period return</option>
+          </select>
+          <button id="f-refresh" class="btn">↻ Scan</button>
+        </div>
+      </div>
+
+      <div id="dash-loader" class="loader">Scanning market…</div>
+      <div class="tables">
+        <div class="card">
+          <h3 class="tbl-title buy">🟢 Top to BUY</h3>
+          <div class="table-scroll">
+            <table id="tbl-buy"></table>
+          </div>
+        </div>
+        <div class="card">
+          <h3 class="tbl-title sell">🔴 Avoid / SELL signals</h3>
+          <div class="table-scroll">
+            <table id="tbl-sell"></table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="disclaimer" id="disclaimer"></footer>
+  </main>
+
+  <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+
+</html>

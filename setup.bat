@@ -1,0 +1,8 @@
+@echo off
+REM One-time setup: install Python dependencies
+cd /d "%~dp0"
+echo Installing dependencies...
+python -m pip install -r requirements.txt
+echo.
+echo Done. Now run:  run.bat
+pause
