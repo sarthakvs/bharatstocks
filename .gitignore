@@ -1,10 +1,23 @@
+# ---- Python ----
 __pycache__/
 *.pyc
 *.pyo
 .venv/
 venv/
 env/
+
+# ---- Secrets / local config — NEVER commit ----
 .env
+.env.*
+!.env.example
+
+# ---- Logs / OS / build ----
 *.log
 node_modules/
 .DS_Store
+*.png
+
+# ---- Personal data: deny ALL data json by default, allow only the bundled
+#      reference universe. New personal files (holdings, alerts, …) can't leak. ----
+data/*.json
+!data/nse_stocks.json

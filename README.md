@@ -23,6 +23,7 @@ levels — for both **short-term** (swing) and **long-term** (investing) horizon
 | 🌱 **Steady risers** | Screener for stocks climbing **quietly and steadily** (smooth trend via regression R², high % up-days, low volatility, rising OBV/volume = accumulation, not yet overextended) — the kind of move that often *precedes* the news. |
 | ✏️ **Chart editor** | Auto-drawn **entry / stop / target** price lines, plus **drag-to-draw trendlines**, click **horizontal lines**, clear, and **download the chart as PNG**. |
 | 🔔 **Price alerts** | Set a **target / stop-loss alert** on any stock (pre-filled from the recommendation); get an **email** when it's hit. Background poller + on-demand `/api/alerts/check`. |
+| 💼 **My Portfolio** | Import your **real holdings/trades** (CSV/paste from Kotak Neo or ICICI Direct, manual add, or optional broker API). Per-holding **P&L, buy/sell signal, protective stop-loss & target, entry-quality (was it a good buy?) and a plain-English "what to do".** |
 | 🧮 **Full technicals** | RSI, MACD, ADX, Stochastic, Bollinger, ATR, OBV + news sentiment + fundamentals (P/E, P/B, ROE, market cap, 52-week range, analyst target) + historical win-rate backtest. |
 | 📱 **Responsive** | Works on mobile — full-width search, stacked layout. |
 
@@ -100,6 +101,66 @@ python app.py
 ```
 
 Requires **Python 3.10+** and an internet connection (for live data).
+
+---
+
+## My Portfolio — import your trades & get per-holding guidance
+
+Open **💼** in the header. Three ways to get your holdings in:
+
+1. **Manual** — *+ Add holding* (symbol, qty, avg price, optional buy date).
+2. **CSV / paste (recommended, zero setup)** — in **Kotak Neo** (Orders → download CSV) or
+   **ICICI Direct** (Equity → Tradebook → Download → Excel), export your holdings/tradebook,
+   save as CSV, then *⤓ Import* and paste the rows or pick the file. Columns
+   (Symbol/Qty/Avg Price/Date) are **auto-detected**, and a buy/sell **tradebook is netted**
+   into current positions.
+3. **Live broker API (optional, advanced)** — see below.
+
+For each holding you get, from **live data**: P&L, the current buy/sell signal, a
+**protective stop-loss & target** (long-position levels — stop *below* price), an
+**entry-quality** read (computed from the indicators *as of your buy date* — e.g.
+"bought below the 200-DMA" / "overbought"), and a plain-English **verdict**
+(hold / add / book / cut). Holdings are stored locally in `data/holdings.json`
+(git-ignored).
+
+> If your broker's CSV columns don't map cleanly, send me one sample export (fake
+> numbers are fine) and the parser can be tuned to it exactly.
+
+### Optional: live broker auto-import
+
+`analysis/brokers.py` pulls holdings directly via the official SDKs. Install
+them **locally** (two steps — the Kotak SDK pins an old `websockets` that breaks
+yfinance, so re-pin it after):
+
+```bash
+python -m pip install -r requirements-broker.txt
+python -m pip install "websockets>=13"
+```
+
+> ⚠️ **Security:** broker API keys/sessions can **place trades**. This module only
+> calls read-only holdings methods and never stores your credentials (used once
+> per request) — but **run it locally only**, never on a shared/cloud host, and
+> never commit keys.
+
+**Kotak Neo (v2 — TOTP):** in the Portfolio tab → *⤓ Import → 🔗 Connect Kotak Neo*.
+You'll need:
+- **Consumer Key** — Kotak Neo app → Invest → **Trade API** card.
+- **TOTP** — register once at kotaksecurities.com, then enter the current 6-digit
+  code from your authenticator app.
+- **Mobile number** (with country code) or **UCC**, and your **MPIN**.
+
+The flow is `NeoAPI(consumer_key) → totp_login(mobile/ucc, totp) → totp_validate(mpin) → holdings()`.
+
+**ICICI Direct (Breeze):** `POST /api/portfolio/broker` with
+`{"broker":"icici","api_key":…,"api_secret":…,"session_token":…}` — get the
+session token from `https://api.icicidirect.com/apiuser/login?api_key=YOUR_KEY` (daily).
+
+> Verified end-to-end that the Kotak v2 SDK installs, coexists with yfinance, and
+> the call reaches Kotak's servers with correct method signatures. The happy path
+> (a successful login + holdings field mapping) can only be confirmed with a live
+> account — the connector reports the exact field names if mapping ever needs a tweak.
+
+`GET /api/portfolio/brokers` reports which SDKs are installed.
 
 ---
 

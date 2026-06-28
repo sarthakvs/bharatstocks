@@ -1,0 +1,27 @@
+#!/bin/sh
+# Safety net: refuse to commit secret files / personal data, even if .gitignore
+# is bypassed (e.g. `git add -f`). Only inspects files being ADDED or MODIFIED
+# (deletions are fine). Activate once with:
+#     git config core.hooksPath .githooks
+# To intentionally override for a single commit: git commit --no-verify
+
+added=$(git diff --cached --name-only --diff-filter=ACM)
+
+bad=$(printf '%s\n' "$added" \
+  | grep -Ei '(^|/)\.env($|\.)|data/holdings\.json|data/alerts\.json' \
+  | grep -v '\.env\.example$')
+
+# Hardcoded secret assigned to a quoted literal (avoids matching type hints/kwargs).
+secret=$(git diff --cached -U0 --diff-filter=ACM 2>/dev/null | grep -E '^\+' \
+  | grep -EI '(APP_PASSWORD|SMTP_PASS|API_SECRET|api_secret|SESSION_TOKEN|session_token)[[:space:]]*=[[:space:]]*["'\''][^"'\'' ]{4,}')
+
+if [ -n "$bad" ] || [ -n "$secret" ]; then
+  echo "------------------------------------------------------------------"
+  echo " Commit blocked: sensitive file or hardcoded secret detected."
+  echo "------------------------------------------------------------------"
+  [ -n "$bad" ]    && printf '%s\n' "$bad"    | sed 's/^/   file: /'
+  [ -n "$secret" ] && printf '%s\n' "$secret" | sed 's/^/   line: /'
+  echo
+  echo " Keep these out of git. If this is a false alarm: git commit --no-verify"
+  exit 1
+fi

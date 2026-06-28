@@ -15,7 +15,15 @@ from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
 from flask import Flask, Response, jsonify, render_template, request
 
-from analysis import alerts, data, indicators, scoring, universe, yahoo
+from analysis import alerts, brokers, data, indicators, portfolio, scoring, universe, yahoo
+
+# Load a local .env (git-ignored) if present, so secrets live outside the repo
+# and outside your shell history. No-op if python-dotenv isn't installed.
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
 
 app = Flask(__name__)
 # Re-read templates from disk when they change (negligible cost; avoids serving
@@ -282,6 +290,79 @@ def api_steady():
         "ok": True, "universe": uni, "count": len(rows),
         "as_of": _now_ist(), "rows": rows, "disclaimer": DISCLAIMER,
     })
+
+
+@app.route("/api/portfolio", methods=["GET", "POST"])
+def api_portfolio():
+    if request.method == "POST":
+        b = request.get_json(silent=True) or {}
+        sym = (b.get("symbol") or "").strip().upper()
+        qty, avg = b.get("qty"), b.get("avg_price")
+        if not sym or qty in (None, "") or avg in (None, ""):
+            return jsonify({"ok": False, "error": "symbol, qty and avg_price are required"}), 400
+        try:
+            h = portfolio.add_holding(sym, float(qty), float(avg),
+                                      b.get("buy_date", ""), b.get("broker", ""),
+                                      b.get("note", ""), b.get("name", ""))
+        except (TypeError, ValueError):
+            return jsonify({"ok": False, "error": "qty and avg_price must be numbers"}), 400
+        return jsonify({"ok": True, "holding": h})
+    horizon = request.args.get("horizon", "long")
+    return jsonify({"ok": True, **portfolio.analyze_portfolio(horizon)})
+
+
+@app.route("/api/portfolio/import", methods=["POST"])
+def api_portfolio_import():
+    text = ""
+    if request.is_json:
+        text = (request.get_json(silent=True) or {}).get("text", "")
+    if not text and request.files.get("file"):
+        text = request.files["file"].read().decode("utf-8", errors="ignore")
+    if not text:
+        text = request.get_data(as_text=True)
+    result = portfolio.import_text(text or "")
+    return jsonify(result), (200 if result.get("ok") else 400)
+
+
+@app.route("/api/portfolio/<hid>", methods=["DELETE"])
+def api_portfolio_delete(hid):
+    return jsonify({"ok": portfolio.delete_holding(hid)})
+
+
+@app.route("/api/portfolio/clear", methods=["POST"])
+def api_portfolio_clear():
+    return jsonify({"ok": True, "removed": portfolio.clear_holdings()})
+
+
+@app.route("/api/portfolio/brokers")
+def api_portfolio_brokers():
+    return jsonify({"ok": True, "available": brokers.available()})
+
+
+@app.route("/api/portfolio/broker", methods=["POST"])
+def api_portfolio_broker():
+    """Optional LIVE import from a broker. Credentials are used once, not stored."""
+    b = request.get_json(silent=True) or {}
+    broker = (b.get("broker") or "").lower()
+    try:
+        if broker == "icici":
+            recs = brokers.import_icici(b.get("api_key", ""), b.get("api_secret", ""),
+                                        b.get("session_token", ""))
+        elif broker == "kotak":
+            if not b.get("consumer_key") or not (b.get("mobile_number") or b.get("ucc")) \
+                    or not b.get("totp") or not b.get("mpin"):
+                return jsonify({"ok": False, "error": "Need consumer_key, mobile_number (or ucc), "
+                                "totp and mpin."}), 400
+            recs = brokers.import_kotak(b.get("consumer_key", ""), b.get("mobile_number", ""),
+                                        b.get("ucc", ""), b.get("totp", ""), b.get("mpin", ""))
+        else:
+            return jsonify({"ok": False, "error": "Unknown broker (use 'icici' or 'kotak')."}), 400
+    except ImportError:
+        return jsonify({"ok": False, "error": f"{broker} SDK not installed. "
+                        "pip install breeze-connect (ICICI) / neo-api-client (Kotak)."}), 400
+    except Exception as e:
+        return jsonify({"ok": False, "error": f"Broker import failed: {str(e)[:200]}"}), 400
+    return jsonify({"ok": True, "fetched": len(recs), "added": portfolio.add_many(recs)})
 
 
 @app.route("/api/config")

@@ -4,6 +4,7 @@ pandas>=2.0
 numpy>=1.26
 requests>=2.31
 vaderSentiment>=3.3.2
+python-dotenv>=1.0
 # Production WSGI servers (platform-gated): gunicorn on Linux/cloud, waitress on Windows.
 gunicorn>=21.2 ; platform_system != "Windows"
 waitress>=3.0 ; platform_system == "Windows"

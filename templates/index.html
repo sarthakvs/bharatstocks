@@ -25,6 +25,7 @@
       <div id="suggest" class="suggest hidden"></div>
     </div>
 
+    <button id="portfolio-btn" class="icon-btn" type="button" title="My portfolio">💼</button>
     <button id="glossary-btn" class="icon-btn" type="button" title="Glossary — what the terms mean">📖</button>
     <button id="alerts-btn" class="icon-btn" type="button" title="Price alerts">🔔</button>
     <div class="asof" id="asof">—</div>
@@ -190,6 +191,39 @@
       </div>
     </section>
 
+    <!-- ===================== PORTFOLIO ===================== -->
+    <section id="portfolio-view" class="hidden">
+      <button id="portfolio-back" class="back-btn" type="button">← Back to dashboard</button>
+      <div class="dash-head">
+        <h2>💼 My Portfolio</h2>
+        <div class="filters">
+          <div class="seg" id="pf-horizon">
+            <button data-h="long" class="active" data-tip="Investing view for your holdings (months–years).">Long-term</button>
+            <button data-h="short" data-tip="Swing view for your holdings (days–weeks).">Short-term</button>
+          </div>
+          <button id="pf-add-btn" class="btn" type="button">+ Add holding</button>
+          <button id="pf-import-btn" class="btn" type="button">⤓ Import</button>
+          <button id="pf-refresh" class="btn" type="button">↻</button>
+          <button id="pf-clear" class="btn-ghost" type="button">Clear all</button>
+        </div>
+      </div>
+
+      <div id="pf-summary" class="pf-summary"></div>
+
+      <div id="pf-add-form" class="pf-add hidden">
+        <input id="pf-sym" placeholder="Symbol (e.g. RELIANCE)" autocomplete="off" />
+        <input id="pf-qty" type="number" step="any" placeholder="Qty" />
+        <input id="pf-avg" type="number" step="any" placeholder="Avg buy price ₹" />
+        <input id="pf-date" type="date" title="Buy date (optional)" />
+        <button id="pf-save" class="btn" type="button">Add</button>
+        <span id="pf-add-msg" class="muted"></span>
+      </div>
+
+      <div id="pf-loader" class="loader hidden">Analysing your holdings…</div>
+      <div class="card"><div class="table-scroll"><table id="tbl-portfolio"></table></div></div>
+      <p class="muted" id="pf-note" style="margin-top:12px"></p>
+    </section>
+
     <!-- ===================== GLOSSARY ===================== -->
     <section id="glossary-view" class="hidden">
       <button id="glossary-back" class="back-btn" type="button">← Back to dashboard</button>
@@ -211,6 +245,53 @@
 
     <footer class="disclaimer" id="disclaimer"></footer>
   </main>
+
+  <!-- ===================== IMPORT MODAL ===================== -->
+  <div id="import-modal" class="modal hidden">
+    <div class="modal-card" style="max-width:540px">
+      <h3>Import holdings / tradebook</h3>
+      <p class="muted" style="margin:-2px 0 12px; line-height:1.5">
+        In <b>Kotak Neo</b> (Orders → download CSV) or <b>ICICI Direct</b> (Equity → Tradebook → Download → Excel),
+        export your holdings/tradebook. Save as CSV, then paste the rows or choose the file —
+        columns (Symbol, Qty, Avg Price, Date) are auto-detected. Buy/Sell tradebooks are netted into positions.
+      </p>
+      <textarea id="import-text" rows="7" placeholder="Paste CSV rows here, e.g.
+Symbol,Quantity,Avg Price,Buy Date
+RELIANCE,10,1250.50,2025-01-15
+TCS,5,3200,2024-11-02"></textarea>
+      <div style="margin:10px 0"><input type="file" id="import-file" accept=".csv,.txt,.tsv" /></div>
+      <div id="import-msg" class="am-msg"></div>
+      <div class="modal-actions">
+        <button id="import-cancel" class="btn-ghost" type="button">Cancel</button>
+        <button id="import-save" class="btn" type="button">Import</button>
+      </div>
+      <div class="or-divider"><span>or connect live</span></div>
+      <button id="open-kotak" class="btn-outline" type="button" style="width:100%">🔗 Connect Kotak Neo (API)</button>
+    </div>
+  </div>
+
+  <!-- ===================== KOTAK NEO CONNECT MODAL ===================== -->
+  <div id="kotak-modal" class="modal hidden">
+    <div class="modal-card" style="max-width:460px">
+      <h3>Connect Kotak Neo (API)</h3>
+      <p class="muted" style="margin:-2px 0 12px; line-height:1.5">
+        One-time setup: get your <b>Consumer Key</b> from the Kotak Neo app (Invest → Trade API),
+        and register <b>TOTP</b> at kotaksecurities.com. Enter the current 6-digit TOTP from your
+        authenticator + your MPIN. Credentials are used once to fetch holdings and are
+        <b>never stored</b>. Run this locally only.
+      </p>
+      <label class="fld">Consumer Key<input id="kt-key" autocomplete="off" /></label>
+      <label class="fld">Mobile number (with country code, e.g. +9198…)<input id="kt-mobile" autocomplete="off" placeholder="+9198XXXXXXXX" /></label>
+      <label class="fld">…or UCC (if you don't use mobile)<input id="kt-ucc" autocomplete="off" /></label>
+      <label class="fld">TOTP (6-digit, from your authenticator)<input id="kt-totp" inputmode="numeric" autocomplete="off" /></label>
+      <label class="fld">MPIN<input id="kt-mpin" type="password" inputmode="numeric" autocomplete="off" /></label>
+      <div id="kt-msg" class="am-msg"></div>
+      <div class="modal-actions">
+        <button id="kt-cancel" class="btn-ghost" type="button">Cancel</button>
+        <button id="kt-save" class="btn" type="button">Connect &amp; import</button>
+      </div>
+    </div>
+  </div>
 
   <!-- ===================== ALERT MODAL ===================== -->
   <div id="alert-modal" class="modal hidden">

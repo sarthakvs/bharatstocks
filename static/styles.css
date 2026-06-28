@@ -881,6 +881,73 @@ th[data-tip] { text-decoration: underline dotted rgba(138,150,173,.5); text-unde
 .gl-term { font-weight: 700; font-size: 13.5px; margin-bottom: 3px; display: inline-block; }
 .gl-desc { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
 
+/* ---------- Import modal extras ---------- */
+.or-divider {
+  display: flex; align-items: center; text-align: center;
+  color: var(--muted); font-size: 11px; margin: 16px 0 12px;
+}
+.or-divider::before, .or-divider::after {
+  content: ""; flex: 1; border-top: 1px solid var(--line);
+}
+.or-divider span { padding: 0 10px; }
+.btn-outline {
+  background: transparent; color: var(--accent);
+  border: 1px solid var(--accent); border-radius: 9px;
+  padding: 9px 14px; font-weight: 600; cursor: pointer; font-size: 13px;
+}
+.btn-outline:hover { background: rgba(76,141,255,.12); }
+
+/* ---------- Portfolio ---------- */
+.pf-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.pf-card {
+  background: linear-gradient(180deg, var(--card), var(--bg2));
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+.pf-card .pf-k { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .4px; }
+.pf-card .pf-v { font-size: 20px; font-weight: 800; margin-top: 4px; }
+
+.pf-add {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  background: var(--bg2); border: 1px solid var(--line);
+  border-radius: 10px; padding: 12px; margin-bottom: 14px;
+}
+.pf-add input {
+  background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+  color: var(--text); padding: 8px 10px; font-size: 13px; outline: none;
+}
+.pf-add input:focus { border-color: var(--accent); }
+.pf-add #pf-sym { width: 200px; text-transform: uppercase; }
+.pf-add #pf-qty, .pf-add #pf-avg { width: 120px; }
+
+#tbl-portfolio td { vertical-align: top; }
+.vbadge { font-size: 11.5px; line-height: 1.4; display: inline-block; max-width: 280px; white-space: normal; }
+.vbadge.v-good { color: var(--green); }
+.vbadge.v-neutral { color: var(--amber); }
+.vbadge.v-warn { color: var(--amber); }
+.vbadge.v-bad { color: var(--red); }
+.eq { font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 12px; text-transform: capitalize; cursor: help; }
+.eq-good { background: rgba(46,204,113,.16); color: var(--green); }
+.eq-fair { background: rgba(138,150,173,.16); color: var(--muted); }
+.eq-stretched { background: rgba(255,182,72,.16); color: var(--amber); }
+.eq-risky { background: rgba(255,87,101,.16); color: var(--red); }
+.pf-del {
+  background: transparent; border: 1px solid var(--line); color: var(--red);
+  border-radius: 6px; width: 26px; height: 26px; cursor: pointer; font-size: 15px; line-height: 1;
+}
+.pf-del:hover { background: rgba(255,87,101,.12); }
+#import-text {
+  width: 100%; background: var(--bg2); border: 1px solid var(--line); border-radius: 9px;
+  color: var(--text); padding: 10px; font-size: 12.5px; font-family: ui-monospace, monospace; outline: none; resize: vertical;
+}
+#import-text:focus { border-color: var(--accent); }
+
 /* ---------- Mobile / responsive ---------- */
 @media (max-width: 680px) {
   .topbar {

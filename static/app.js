@@ -296,6 +296,8 @@ const STOCK_HASH = "#/stock/";
 const DASH_HASH = "#/";
 const ALERTS_HASH = "#/alerts";
 const GLOSSARY_HASH = "#/glossary";
+const PORTFOLIO_HASH = "#/portfolio";
+const pf = { horizon: "long" };
 
 function go(hash) {
   if (location.hash === hash) route();   // same hash -> force a re-route
@@ -308,6 +310,7 @@ function hideAllViews() {
   $("dashboard").classList.add("hidden");
   $("alerts-view").classList.add("hidden");
   $("glossary-view").classList.add("hidden");
+  $("portfolio-view").classList.add("hidden");
 }
 
 function route() {
@@ -319,9 +322,20 @@ function route() {
     openAlertsView();
   } else if (h === GLOSSARY_HASH) {
     openGlossaryView();
+  } else if (h === PORTFOLIO_HASH) {
+    openPortfolioView();
   } else {
     openDashboard();
   }
+}
+
+function openPortfolioView() {
+  if (window.autoRefresh) clearInterval(window.autoRefresh);
+  if (window.autoRefreshTop) clearInterval(window.autoRefreshTop);
+  hideAllViews();
+  $("portfolio-view").classList.remove("hidden");
+  window.scrollTo({ top: 0 });
+  loadPortfolio();
 }
 
 function openGlossaryView() {
@@ -962,6 +976,153 @@ async function saveAlert() {
 }
 
 // ---------------------------------------------------------------------------
+// Portfolio
+// ---------------------------------------------------------------------------
+const verdictClass = { good: "v-good", neutral: "v-neutral", warn: "v-warn", bad: "v-bad" };
+
+async function loadPortfolio() {
+  $("pf-loader").classList.remove("hidden");
+  try {
+    const d = await api(`/api/portfolio?horizon=${pf.horizon}`);
+    renderPortfolioSummary(d.summary);
+    renderPortfolioTable(d.holdings || []);
+    if (d.as_of) $("asof").textContent = "As of " + d.as_of;
+    $("pf-note").innerHTML = (d.holdings && d.holdings.length)
+      ? "Stop-loss & target are <b>protective levels for a long position</b> (stop below price, target above). “Entry” rates your buy point as of your buy date. Educational analysis — not investment advice."
+      : "Your portfolio is empty — use <b>+ Add holding</b> or <b>⤓ Import</b> your tradebook.";
+  } catch (e) {
+    $("tbl-portfolio").innerHTML = `<tbody><tr><td class="muted">⚠ ${e.message}</td></tr></tbody>`;
+  } finally {
+    $("pf-loader").classList.add("hidden");
+  }
+}
+
+function renderPortfolioSummary(s) {
+  if (!s) { $("pf-summary").innerHTML = ""; return; }
+  const pnlCls = (s.pnl ?? 0) >= 0 ? "up" : "down";
+  const cards = [
+    { k: "Holdings", v: s.count },
+    { k: "Invested", v: inr(s.invested) },
+    { k: "Current value", v: inr(s.current_value) },
+    { k: "Total P&L", v: `<span class="${pnlCls}">${inr(s.pnl)} <small>(${s.pnl_pct == null ? "—" : (s.pnl_pct >= 0 ? "+" : "") + fmt(s.pnl_pct) + "%"})</small></span>` },
+  ];
+  $("pf-summary").innerHTML = cards.map((c) =>
+    `<div class="pf-card"><div class="pf-k">${c.k}</div><div class="pf-v">${c.v}</div></div>`).join("");
+}
+
+function renderPortfolioTable(rows) {
+  const head = `<thead><tr>
+    <th class="l">Stock</th><th>Qty</th><th>Avg cost</th><th>LTP</th><th>P&amp;L</th>
+    <th${tipAttr("action")}>Signal</th><th${tipAttr("stop_loss")}>Stop</th><th${tipAttr("target")}>Target</th>
+    <th>Entry</th><th class="l">What to do</th><th></th>
+  </tr></thead>`;
+  const body = rows.map((a) => {
+    const pnlCls = (a.pnl ?? 0) >= 0 ? "up" : "down";
+    const eq = a.entry_quality;
+    const eqBadge = eq
+      ? `<span class="eq eq-${eq.quality}" data-tip="${(eq.notes || []).join('; ').replace(/"/g, "'")}">${eq.quality}</span>`
+      : '<span class="muted">—</span>';
+    const v = a.verdict || {};
+    return `<tr data-sym="${a.symbol}">
+      <td class="l"><div class="sym">${a.symbol}</div><div class="muted">${(a.name || '').slice(0, 20)}</div></td>
+      <td>${fmt(a.qty, 0)}</td>
+      <td>${inr(a.avg_price)}</td>
+      <td>${a.current_price != null ? inr(a.current_price) : '—'}</td>
+      <td class="${pnlCls}">${a.pnl != null ? inr(a.pnl) : '—'}<div class="muted">${a.pnl_pct != null ? (a.pnl_pct >= 0 ? '+' : '') + fmt(a.pnl_pct) + '%' : ''}</div></td>
+      <td>${a.label ? `<span class="pill ${a.action}">${a.label}</span>` : '—'}</td>
+      <td>${a.stop_loss != null ? inr(a.stop_loss) : '—'}</td>
+      <td>${a.target != null ? inr(a.target) : '—'}</td>
+      <td>${eqBadge}</td>
+      <td class="l"><span class="vbadge ${verdictClass[v.tone] || ''}">${v.text || '—'}</span></td>
+      <td><button class="pf-del" data-id="${a.id}" title="Remove">×</button></td>
+    </tr>`;
+  }).join("");
+  const el = $("tbl-portfolio");
+  el.innerHTML = head + "<tbody>" + (body || `<tr><td colspan="11" class="muted">No holdings yet.</td></tr>`) + "</tbody>";
+  el.querySelectorAll("tbody tr[data-sym]").forEach((tr) =>
+    tr.addEventListener("click", (e) => { if (!e.target.closest(".pf-del")) selectSymbol(tr.dataset.sym); }));
+  el.querySelectorAll(".pf-del").forEach((btn) =>
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      await fetch("/api/portfolio/" + btn.dataset.id, { method: "DELETE" });
+      loadPortfolio();
+    }));
+}
+
+async function savePfHolding() {
+  const sym = $("pf-sym").value.trim().toUpperCase();
+  const qty = $("pf-qty").value, avg = $("pf-avg").value, date = $("pf-date").value;
+  const msg = $("pf-add-msg");
+  if (!sym || !qty || !avg) { msg.textContent = "Symbol, qty and avg price are required."; return; }
+  msg.textContent = "Adding…";
+  try {
+    const r = await fetch("/api/portfolio", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ symbol: sym, qty, avg_price: avg, buy_date: date }),
+    });
+    const d = await r.json();
+    if (!d.ok) { msg.textContent = "⚠ " + (d.error || "Failed"); return; }
+    $("pf-sym").value = $("pf-qty").value = $("pf-avg").value = $("pf-date").value = "";
+    msg.textContent = "";
+    $("pf-add-form").classList.add("hidden");
+    loadPortfolio();
+  } catch (e) { msg.textContent = "⚠ " + e.message; }
+}
+
+function openImportModal() { $("import-msg").textContent = ""; $("import-msg").className = "am-msg"; $("import-modal").classList.remove("hidden"); }
+function closeImportModal() { $("import-modal").classList.add("hidden"); }
+async function doImport() {
+  const msg = $("import-msg");
+  let text = $("import-text").value;
+  const file = $("import-file").files[0];
+  msg.className = "am-msg"; msg.textContent = "Importing…";
+  try {
+    if (file && !text.trim()) text = await file.text();
+    const r = await fetch("/api/portfolio/import", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }),
+    });
+    const d = await r.json();
+    if (!d.ok) { msg.className = "am-msg err"; msg.textContent = "⚠ " + (d.error || "Failed"); return; }
+    msg.className = "am-msg ok";
+    msg.textContent = `✓ Imported ${d.added} holding(s)${d.skipped ? ` (skipped ${d.skipped})` : ""} from your ${d.kind}.`;
+    $("import-text").value = ""; $("import-file").value = "";
+    setTimeout(() => { closeImportModal(); loadPortfolio(); }, 1100);
+  } catch (e) { msg.className = "am-msg err"; msg.textContent = "⚠ " + e.message; }
+}
+
+function openKotakModal() {
+  $("kt-msg").textContent = ""; $("kt-msg").className = "am-msg";
+  closeImportModal();
+  $("kotak-modal").classList.remove("hidden");
+}
+function closeKotakModal() { $("kotak-modal").classList.add("hidden"); }
+async function doKotakImport() {
+  const msg = $("kt-msg");
+  const body = {
+    broker: "kotak",
+    consumer_key: $("kt-key").value.trim(),
+    mobile_number: $("kt-mobile").value.trim(),
+    ucc: $("kt-ucc").value.trim(),
+    totp: $("kt-totp").value.trim(),
+    mpin: $("kt-mpin").value.trim(),
+  };
+  if (!body.consumer_key || (!body.mobile_number && !body.ucc) || !body.totp || !body.mpin) {
+    msg.className = "am-msg err"; msg.textContent = "Fill consumer key, mobile/UCC, TOTP and MPIN."; return;
+  }
+  msg.className = "am-msg"; msg.textContent = "Connecting to Kotak Neo…";
+  try {
+    const r = await fetch("/api/portfolio/broker", {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    const d = await r.json();
+    if (!d.ok) { msg.className = "am-msg err"; msg.textContent = "⚠ " + (d.error || "Failed"); return; }
+    msg.className = "am-msg ok"; msg.textContent = `✓ Imported ${d.added} of ${d.fetched} holding(s) from Kotak Neo.`;
+    $("kt-totp").value = ""; $("kt-mpin").value = "";  // wipe sensitive fields
+    setTimeout(() => { closeKotakModal(); loadPortfolio(); }, 1200);
+  } catch (e) { msg.className = "am-msg err"; msg.textContent = "⚠ " + e.message; }
+}
+
+// ---------------------------------------------------------------------------
 // Wiring
 // ---------------------------------------------------------------------------
 $("horizon-toggle").addEventListener("click", (e) => {
@@ -1035,6 +1196,33 @@ $("alerts-btn").addEventListener("click", () => go(ALERTS_HASH));
 $("alerts-back").addEventListener("click", () => go(DASH_HASH));
 $("glossary-btn").addEventListener("click", () => go(GLOSSARY_HASH));
 $("glossary-back").addEventListener("click", () => go(DASH_HASH));
+
+// portfolio
+$("portfolio-btn").addEventListener("click", () => go(PORTFOLIO_HASH));
+$("portfolio-back").addEventListener("click", () => go(DASH_HASH));
+$("pf-horizon").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  pf.horizon = b.dataset.h;
+  $("pf-horizon").querySelectorAll("button").forEach((x) => x.classList.toggle("active", x === b));
+  loadPortfolio();
+});
+$("pf-add-btn").addEventListener("click", () => $("pf-add-form").classList.toggle("hidden"));
+$("pf-save").addEventListener("click", savePfHolding);
+$("pf-refresh").addEventListener("click", loadPortfolio);
+$("pf-clear").addEventListener("click", async () => {
+  if (confirm("Remove ALL holdings from your portfolio?")) {
+    await fetch("/api/portfolio/clear", { method: "POST" });
+    loadPortfolio();
+  }
+});
+$("pf-import-btn").addEventListener("click", openImportModal);
+$("import-cancel").addEventListener("click", closeImportModal);
+$("import-save").addEventListener("click", doImport);
+$("import-modal").addEventListener("click", (e) => { if (e.target.id === "import-modal") closeImportModal(); });
+$("open-kotak").addEventListener("click", openKotakModal);
+$("kt-cancel").addEventListener("click", closeKotakModal);
+$("kt-save").addEventListener("click", doKotakImport);
+$("kotak-modal").addEventListener("click", (e) => { if (e.target.id === "kotak-modal") closeKotakModal(); });
 $("set-alert-btn").addEventListener("click", openAlertModal);
 $("am-cancel").addEventListener("click", closeAlertModal);
 $("am-save").addEventListener("click", saveAlert);

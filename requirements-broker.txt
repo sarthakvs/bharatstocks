@@ -1,0 +1,13 @@
+# OPTIONAL — only for LIVE broker auto-import (Portfolio → Connect).
+# Install LOCALLY only: broker API keys/sessions can place trades.
+#
+# Install in two steps (the Kotak SDK pins an old websockets that breaks yfinance,
+# so re-pin websockets afterwards):
+#   python -m pip install -r requirements-broker.txt
+#   python -m pip install "websockets>=13"
+
+# Kotak Neo (v2 SDK — TOTP login flow)
+neo_api_client @ git+https://github.com/Kotak-Neo/Kotak-neo-api-v2.git@v2.0.2
+
+# ICICI Direct (Breeze)
+breeze-connect
